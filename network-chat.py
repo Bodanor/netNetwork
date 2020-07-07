@@ -11,8 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
 import socket, time, threading
 
-# TODO Essayer d'implementer Un nouveau signal seulement pour les boutons (EX de def : ActivateButton)
 
+# TODO Essayer d'implementer Un nouveau signal seulement pour les boutons (EX de def : ActivateButton)
+# TODO AJouter message qu'on envooie dans le ChatText
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -48,7 +49,7 @@ class Ui_MainWindow(object):
         self.portEdit.setObjectName("portEdit")
         self.gridLayout.addWidget(self.portEdit, 0, 3, 1, 1)
         self.gridLayout_2.addLayout(self.gridLayout, 0, 0, 1, 1)
-        self.lineEdit = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit = QtWidgets.QLineEdit(self.centralwidget, enabled=False)
         self.lineEdit.setObjectName("lineEdit")
         self.gridLayout_2.addWidget(self.lineEdit, 3, 0, 1, 1)
         self.sendButton = QtWidgets.QPushButton(self.centralwidget, enabled=False)
@@ -67,6 +68,10 @@ class Ui_MainWindow(object):
         self.ipEdit.textChanged.connect(self.enableConnectButton)
         self.portEdit.textEdited.connect(self.enableConnectButton)
         self.connectButton.clicked.connect(self.connectServer)
+        self.sendButton.clicked.connect(self.sendData)
+        self.lineEdit.returnPressed.connect(self.sendData)
+        self.ipEdit.returnPressed.connect(self.connectServer)
+        self.portEdit.returnPressed.connect(self.connectServer)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -109,6 +114,7 @@ class Ui_MainWindow(object):
         self.connectButton.setDisabled(True)
         self.s = Server(self.Ip, self.port)
         self.s.StatusReport.connect(self.updateStatus)
+        self.s.ChatTextReport.connect(self.updateChatText)
         self.server = threading.Thread(target=self.s.ConnectServer)
         self.server.start()
 
@@ -119,28 +125,42 @@ class Ui_MainWindow(object):
         if Typemessage == "Error":
             self.connectButton.setEnabled(True)
             self.sendButton.setDisabled(True)
+            self.lineEdit.setDisabled(True)
 
         if Typemessage == "Connection":
             self.sendButton.setEnabled(True)
             self.connectButton.setDisabled(True)
+            self.lineEdit.setEnabled(True)
+            self.chatText.clear()
 
+    def sendData(self):
+        data = self.lineEdit.text()
+        self.s.sendData(data)
+        self.lineEdit.clear()
+
+    def updateChatText(self, data):
+        self.chatText.append(data)
 
 class Server(QObject):
     StatusReport = pyqtSignal(str, str, str)
+    ChatTextReport = pyqtSignal(str)
 
     def __init__(self, Ip, Port):
         QObject.__init__(self)
         self.Ip = Ip
         self.Port = Port
-
+        self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverSocket.settimeout(1)
+        self.fragments = []
     def ConnectServer(self):
         try:
-            serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.StatusReport.emit("#1ABC9C", "Connecting...", "Info")
-
-            serverSocket.settimeout(1)
-            serverSocket.connect((self.Ip, int(self.Port)))
+            self.serverSocket.connect((self.Ip, int(self.Port)))
             self.StatusReport.emit("#8E44AD", "Connected to {}".format(self.Ip), "Connection")
+            self.serverSocket.settimeout(None)
+            self.FetchThread = threading.Thread(target=self.FetchServer)
+            self.FetchThread.start()
+
         except socket.timeout:
             self.StatusReport.emit("#FF0000", "Connection Timed out !", "Error")
 
@@ -149,6 +169,21 @@ class Server(QObject):
 
         except ConnectionRefusedError:
             self.StatusReport.emit("#FF0000", "Connection refused by server !", "Error")
+
+    def FetchServer(self):
+
+        while True:
+            data = self.serverSocket.recv(2048)
+            if not data:
+                self.StatusReport.emit("#FF0000", "Connexion Lost !", "Error")
+                break
+            else:
+                data = data.decode("UTF8")
+                self.ChatTextReport.emit(data)
+
+
+    def sendData(self, data):
+        self.serverSocket.send(bytes(data, "UTF-8"))
 
 
 if __name__ == "__main__":
