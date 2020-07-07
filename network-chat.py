@@ -12,8 +12,8 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
 import socket, time, threading
 
 
-# TODO Essayer d'implementer Un nouveau signal seulement pour les boutons (EX de def : ActivateButton)
-# TODO AJouter message qu'on envooie dans le ChatText
+# TODO AJouter message qu'on envoie dans le ChatText
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -133,10 +133,15 @@ class Ui_MainWindow(object):
             self.lineEdit.setEnabled(True)
             self.chatText.clear()
 
+
     def sendData(self):
         data = self.lineEdit.text()
-        self.s.sendData(data)
-        self.lineEdit.clear()
+        if data != "":
+            self.s.sendData(data)
+            self.lineEdit.clear()
+            self.chatText.append("You: " + data)
+        else:
+            pass
 
     def updateChatText(self, data):
         self.chatText.append(data)
@@ -152,6 +157,7 @@ class Server(QObject):
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverSocket.settimeout(1)
         self.fragments = []
+
     def ConnectServer(self):
         try:
             self.StatusReport.emit("#1ABC9C", "Connecting...", "Info")
@@ -181,14 +187,12 @@ class Server(QObject):
                 data = data.decode("UTF8")
                 self.ChatTextReport.emit(data)
 
-
     def sendData(self, data):
         self.serverSocket.send(bytes(data, "UTF-8"))
 
 
 if __name__ == "__main__":
     import sys
-
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
