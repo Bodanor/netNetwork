@@ -11,14 +11,16 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
 import socket, time, threading
 
-#TODO Change self.port into self.Port
-#TODO thread.finished NOT WORKING !!!!!
+
+# TODO ChatUI crée mais pas connecte inutile
 
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(708, 181)
+        MainWindow.setMaximumSize(708,181)
+        MainWindow.setMinimumSize(700,200)
         MainWindow.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setLayoutDirection(QtCore.Qt.LeftToRight)
@@ -76,7 +78,7 @@ class Ui_MainWindow(object):
                 if int(self.PortInput.text()) < 65535 and int(self.PortInput.text()) > 0:
                     self.ConnectButton.setEnabled(True)
                     self.Ip = self.IPInput.text()
-                    self.port = self.PortInput.text()
+                    self.Port = self.PortInput.text()
 
                 else:
                     self.ConnectButton.setDisabled(True)
@@ -92,18 +94,19 @@ class Ui_MainWindow(object):
 
     def connectServer(self):
         self.ConnectButton.setDisabled(True)
-        self.obj = Server(self.Ip, self.port)
-        self.thread = QtCore.QThread()
-        self.obj.StatusReport.connect(self.updateStatus)
-        self.obj.moveToThread(self.thread)
-        self.thread.finished.connect(lambda x : print("hey"))
-        self.thread.started.connect(self.obj.ConnectServer)
-        self.thread.start()
-
+        self.server = Server(self.Ip, self.Port)
+        self.server_thread = QtCore.QThread()
+        self.server.StatusReport.connect(self.updateStatus)
+        self.server.DisableButton.connect(self.disableButtons)
+        self.server.EnableButton.connect(self.enableButtons)
+        self.server.showChat.connect(self.showUIChat)
+        self.server.moveToThread(self.server_thread)
+        self.server.finished.connect(self.server_thread.quit)
+        self.server_thread.started.connect(self.server.ConnectServer)
+        self.server_thread.start()
 
     def disableButtons(self, Button):
         Button.setDisabled(True)
-
 
     def enableButtons(self, Button):
         Button.setEnabled(True)
@@ -113,37 +116,11 @@ class Ui_MainWindow(object):
             "<html><head/><body><p align=\"center\"><span style=\" font-weight:600; color:{};\">{}</span></p></body></html>".format(
                 Color, Text))
 
-
-class ChatUi(object):
-
-    def setupChatUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(400, 300)
-        self.gridLayout_2 = QtWidgets.QGridLayout(MainWindow)
-        self.gridLayout_2.setObjectName("gridLayout_2")
-        self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.setObjectName("gridLayout")
-        self.MessageInput = QtWidgets.QTextEdit(MainWindow)
-        self.MessageInput.setObjectName("MessageInput")
-        self.gridLayout.addWidget(self.MessageInput, 1, 1, 1, 1)
-        self.MessageLabell = QtWidgets.QLabel(MainWindow)
-        self.MessageLabell.setObjectName("MessageLabell")
-        self.gridLayout.addWidget(self.MessageLabell, 1, 0, 1, 1)
-        self.SendButton = QtWidgets.QPushButton(MainWindow)
-        self.SendButton.setObjectName("SendButton")
-        self.gridLayout.addWidget(self.SendButton, 1, 2, 1, 1)
-        self.MainChat = QtWidgets.QTextBrowser(MainWindow)
-        self.MainChat.setObjectName("MainChat")
-        self.gridLayout.addWidget(self.MainChat, 0, 0, 1, 3)
-        self.gridLayout_2.addLayout(self.gridLayout, 0, 0, 1, 1)
-        self.retranslateChatUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateChatUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Chat {}"))
-        self.MessageLabell.setText(_translate("MainWindow", "Message :"))
-        self.SendButton.setText(_translate("MainWindow", "Send"))
+    def showUIChat(self):
+        UI_Chat = QtWidgets.QWidget()
+        ui = Ui_FenClient()
+        ui.setupUi(UI_Chat)
+        UI_Chat.show()
 
     # def sendData(self):
     #     data = self.lineEdit.text()
@@ -154,11 +131,65 @@ class ChatUi(object):
     #     else:
     #         pass
 
+class Ui_FenClient(object):
+    def setupUi(self, FenClient):
+        FenClient.setObjectName("FenClient")
+        FenClient.resize(628, 480)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("chat.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        FenClient.setWindowIcon(icon)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout(FenClient)
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.verticalLayout = QtWidgets.QVBoxLayout()
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.label_5 = QtWidgets.QLabel(FenClient)
+        self.label_5.setPixmap(QtGui.QPixmap("chat.png"))
+        self.label_5.setObjectName("label_5")
+        self.verticalLayout.addWidget(self.label_5)
+        self.horizontalLayout.addLayout(self.verticalLayout)
+        self.verticalLayout_2.addLayout(self.horizontalLayout)
+        self.listeMessages = QtWidgets.QTextEdit(FenClient)
+        self.listeMessages.setReadOnly(True)
+        self.listeMessages.setObjectName("listeMessages")
+        self.verticalLayout_2.addWidget(self.listeMessages)
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.label_3 = QtWidgets.QLabel(FenClient)
+        self.label_3.setObjectName("label_3")
+        self.horizontalLayout_2.addWidget(self.label_3)
+        self.pseudo = QtWidgets.QLineEdit(FenClient)
+        self.pseudo.setMaximumSize(QtCore.QSize(100, 16777215))
+        self.pseudo.setObjectName("pseudo")
+        self.horizontalLayout_2.addWidget(self.pseudo)
+        self.label_4 = QtWidgets.QLabel(FenClient)
+        self.label_4.setObjectName("label_4")
+        self.horizontalLayout_2.addWidget(self.label_4)
+        self.message = QtWidgets.QLineEdit(FenClient)
+        self.message.setObjectName("message")
+        self.horizontalLayout_2.addWidget(self.message)
+        self.boutonEnvoyer = QtWidgets.QPushButton(FenClient)
+        self.boutonEnvoyer.setIcon(icon)
+        self.boutonEnvoyer.setObjectName("boutonEnvoyer")
+        self.horizontalLayout_2.addWidget(self.boutonEnvoyer)
+        self.verticalLayout_2.addLayout(self.horizontalLayout_2)
+
+        self.retranslateUi(FenClient)
+        QtCore.QMetaObject.connectSlotsByName(FenClient)
+
+    def retranslateUi(self, FenClient):
+        _translate = QtCore.QCoreApplication.translate
+        FenClient.setWindowTitle(_translate("FenClient", "ZeroChat - Client"))
+        self.label_3.setText(_translate("FenClient", "Pseudo :"))
+        self.label_4.setText(_translate("FenClient", "Message :"))
+        self.boutonEnvoyer.setText(_translate("FenClient", "Envoyer"))
 
 class Server(QObject):
     StatusReport = pyqtSignal(str, str)
     ChatTextReport = pyqtSignal(str)
     finished = pyqtSignal()
+    showChat = pyqtSignal()
     EnableButton = pyqtSignal(QObject)
     DisableButton = pyqtSignal(QObject)
 
@@ -177,28 +208,24 @@ class Server(QObject):
             self.StatusReport.emit("#8E44AD", "Connected to {}".format(self.Ip))
             self.DisableButton.emit(ui.ConnectButton)
             self.serverSocket.settimeout(None)
-            # self.FetchThread = threading.Thread(target=self.FetchServer)
-            # self.FetchThread.start()
+            self.showChat.emit()
+            self.FetchThread = threading.Thread(target=self.FetchServer)
+            self.FetchThread.start()
 
         except socket.timeout:
             self.StatusReport.emit("#FF0000", "Connection Timed out !")
             self.EnableButton.emit(ui.ConnectButton)
             self.finished.emit()
-            while True:
-                pass
 
         except socket.gaierror:
             self.StatusReport.emit("#FF0000", "Error in IP Address !")
             self.EnableButton.emit(ui.ConnectButton)
             self.finished.emit()
-            while True:
-                pass
+
         except ConnectionRefusedError:
             self.StatusReport.emit("#FF0000", "Connection refused by server !")
             self.EnableButton.emit(ui.ConnectButton)
             self.finished.emit()
-            while True:
-                pass
 
     def FetchServer(self):
 
@@ -219,6 +246,9 @@ class Server(QObject):
 if __name__ == "__main__":
     import sys
 
+
+    def initChat():
+        print("hey")
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
